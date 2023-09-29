@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const tempMovieData = [
   {
@@ -46,6 +46,60 @@ const tempWatchedData = [
     userRating: 9,
   },
 ];
+
+//creating a preloader
+
+function Loader() {
+  return <div className="loader">Loading...</div>;
+}
+
+export default function App() {
+  const [query, setQuery] = useState("");
+  const [movies, setMovies] = useState([]); //tempMovieData
+  const [watched, setWatched] = useState([]); //tempWatchedData
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  const tempQuery = "interstellar";
+  const KEY = "39fe5645";
+
+  useEffect(function () {
+    async function fetchData() {
+      setIsLoading(true);
+      try {
+        const res = await fetch(
+          `http://www.omdbapi.com/?apikey=${KEY}&s=${tempQuery}`
+        );
+        if (!res.ok) throw new Error("Failed to Load movie");
+        const data = await res.json();
+        setIsLoading(false);
+        setMovies(data.Search);
+        console.log(data.Search);
+      } catch (err) {
+        console.error(err);
+        setError(err);
+      }
+    }
+    fetchData();
+  }, []);
+
+  return (
+    <>
+      <Nav movies={movies} query={query} setQuery={setQuery} />
+
+      <main className="main">
+        <Box>
+          {error ? <p>{error}</p> : <Movies movies={movies} />}
+          {isLoading ? <Loader /> : <Movies />}
+        </Box>
+        <Box>
+          <Summary watched={watched} />
+          <WatchedMovies watched={watched} />
+        </Box>
+      </main>
+    </>
+  );
+}
 
 const average = (arr) =>
   arr.reduce((acc, cur, i, arr) => acc + cur / arr.length, 0);
@@ -157,28 +211,5 @@ function Nav({ movies, query, setQuery }) {
         Found <strong>{movies.length}</strong> results
       </p>
     </nav>
-  );
-}
-
-export default function App() {
-  const [query, setQuery] = useState("");
-  const [movies, setMovies] = useState(tempMovieData);
-  const [watched, setWatched] = useState(tempWatchedData);
-
-
-  return (
-    <>
-      <Nav movies={movies} query={query} setMovies={setMovies} />
-
-      <main className="main">
-        <Box>
-          <Movies movies={movies} />
-        </Box>
-        <Box>
-          <Summary watched={watched} />
-          <WatchedMovies watched={watched} />
-        </Box>
-      </main>
-    </>
   );
 }
