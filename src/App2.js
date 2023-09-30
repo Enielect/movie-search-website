@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import StarRating from "./star";
 
 const tempMovieData = [
   {
@@ -53,51 +54,112 @@ function Loader() {
   return <div className="loader">Loading...</div>;
 }
 
+const KEY = "39fe5645";
+
 export default function App() {
   const [query, setQuery] = useState("");
   const [movies, setMovies] = useState([]); //tempMovieData
   const [watched, setWatched] = useState([]); //tempWatchedData
   const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
 
-  const tempQuery = "interstellar";
-  const KEY = "39fe5645";
+  //const tempQuery = "interstellar";
 
-  useEffect(function () {
-    async function fetchData() {
-      setIsLoading(true);
-      try {
-        const res = await fetch(
-          `http://www.omdbapi.com/?apikey=${KEY}&s=${tempQuery}`
-        );
-        if (!res.ok) throw new Error("Failed to Load movie");
-        const data = await res.json();
-        setIsLoading(false);
-        setMovies(data.Search);
-        console.log(data.Search);
-      } catch (err) {
-        console.error(err);
-        setError(err);
+  function handleSelectedId(id) {
+    setSelectedId(id === selectedId ? null : id);
+  }
+
+  function handleBack() {
+    setSelectedId(null);
+  }
+
+  function handleAddToList(movie) {
+    if (watched.find((ele) => ele.imdbID !== movie.imdbID) >= 0) return;
+    setWatched([...watched, movie]);
+    console.log(watched);
+  }
+
+  useEffect(
+    function () {
+      async function fetchData() {
+        setIsLoading(true);
+        setError("");
+        try {
+          const res = await fetch(
+            `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`
+          );
+          if (!res.ok) throw new Error("Failed to Load movie");
+          const data = await res.json();
+          console.log(data);
+          if (data.Response === "False") throw new Error("Movie was not found");
+          setIsLoading(false);
+          setMovies(data.Search);
+          console.log(data.Search);
+        } catch (err) {
+          console.error(err.message);
+          setError(err.message);
+        } finally {
+          setIsLoading(false);
+        }
       }
-    }
-    fetchData();
-  }, []);
+
+      if (query.length < 3) {
+        setMovies([]);
+        setError("");
+        return;
+      }
+      fetchData();
+    },
+    [query]
+  );
 
   return (
     <>
-      <Nav movies={movies} query={query} setQuery={setQuery} />
+      <Nav>
+        <Logo />
+        <Search query={query} setQuery={setQuery} />
+        <MovieLengthResult movies={movies} />
+      </Nav>
 
       <main className="main">
         <Box>
-          {error ? <p>{error}</p> : <Movies movies={movies} />}
-          {isLoading ? <Loader /> : <Movies />}
+          {/* {error ? <p>{error}</p> : <Movies movies={movies} />}
+          {isLoading ? <Loader /> : <Movies />} */}
+          {!isLoading && !error && (
+            <Movies movies={movies} onSelectedId={handleSelectedId} />
+          )}
+          {error && (
+            //  query.length < 4 ? <div className="error">Input the name of the movie</div> : (was trying to set initial state of movied from movies not found to input the name of movie but jonas provided a better way)
+            <ErrorMessage message={error} />
+          )}
+          {isLoading && <Loader />}
         </Box>
         <Box>
-          <Summary watched={watched} />
-          <WatchedMovies watched={watched} />
+          {selectedId ? (
+            <MovieDetails
+              selectedId={selectedId}
+              onLeaveDetails={handleBack}
+              onMovieAddToList={handleAddToList}
+            />
+          ) : (
+            <>
+              <Summary watched={watched} />
+              <WatchedMovies watched={watched} />
+            </>
+          )}
         </Box>
       </main>
     </>
+  );
+}
+
+function ErrorMessage({ message }) {
+  return (
+    <p className="error">
+      <span>♨️</span>
+      {message}
+    </p>
   );
 }
 
@@ -117,11 +179,19 @@ function Box({ children }) {
   );
 }
 
-function Movies({ movies }) {
+function BackButton({ onLeaveDetails }) {
   return (
-    <ul className="list">
+    <button className="btn-back" onClick={onLeaveDetails}>
+      &larr;
+    </button>
+  );
+}
+
+function Movies({ movies, onSelectedId }) {
+  return (
+    <ul className="list list-movies">
       {movies?.map((movie) => (
-        <li key={movie.imdbID}>
+        <li key={movie.imdbID} onClick={() => onSelectedId(movie.imdbID)}>
           <img src={movie.Poster} alt={`${movie.Title} poster`} />
           <h3>{movie.Title}</h3>
           <div>
@@ -133,6 +203,80 @@ function Movies({ movies }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function MovieDetails({ selectedId, onLeaveDetails, onMovieAddToList }) {
+  const [movie, setMovie] = useState({});
+  const [rate, setRate] = useState(0);
+  const {
+    Title: title,
+    Year: year,
+    Poster: poster,
+    Runtime: runtime,
+    imdbRating,
+    Plot: plot,
+    Released: released,
+    Actors: actors,
+    Director: director,
+    Genre: genre,
+  } = movie;
+
+  const obj = {
+    imdbID: selectedId,
+    title,
+    year,
+    poster,
+    runtime,
+    imdbRating,
+    userRating: rate,
+  };
+
+  useEffect(function () {
+    async function getMovieDetails() {
+      const res = await fetch(
+        `http://www.omdbapi.com/?apikey=${KEY}&i=${selectedId}`
+      );
+      const data = await res.json();
+      setMovie(data);
+    }
+    getMovieDetails();
+  });
+
+  return (
+    <div className="details">
+      <header>
+        <BackButton onLeaveDetails={onLeaveDetails} />
+        <img src={poster} alt={`Poster of ${movie} movie`} />
+        <div className="details-overview">
+          <h2>{title}</h2>
+          <p>
+            {released} &bull; {runtime}
+          </p>
+          <p>{genre}</p>
+          <p>
+            <span>⭐</span>
+            {imdbRating} IMDb rating
+          </p>
+        </div>
+      </header>
+      <section>
+        <div className="rating">
+          <StarRating size={24} setRate={setRate} StarSize={10} />
+          {rate !== 0 && (
+            <button className="btn-add" onClick={() => onMovieAddToList(obj)}>
+              &#43; Add to list
+            </button>
+          )}
+        </div>
+        <p>
+          <em>{plot}</em>
+        </p>
+        <p>Starring {actors}</p>
+        <p>Directed by {director}</p>
+        <p>Released in {year}</p>
+      </section>
+    </div>
   );
 }
 
@@ -151,15 +295,15 @@ function Summary({ watched }) {
         </p>
         <p>
           <span>⭐️</span>
-          <span>{avgImdbRating}</span>
+          <span>{avgImdbRating.toFixed(2)}</span>
         </p>
         <p>
           <span>🌟</span>
-          <span>{avgUserRating}</span>
+          <span>{avgUserRating.toFixed(2)}</span>
         </p>
         <p>
           <span>⏳</span>
-          <span>{avgRuntime} min</span>
+          <span>{avgRuntime.toFixed(2)} min</span>
         </p>
       </div>
     </div>
@@ -193,23 +337,35 @@ function WatchedMovies({ watched }) {
   );
 }
 
-function Nav({ movies, query, setQuery }) {
+function Logo() {
   return (
-    <nav className="nav-bar">
-      <div className="logo">
-        <span role="img">🍿</span>
-        <h1>usePopcorn</h1>
-      </div>
-      <input
-        className="search"
-        type="text"
-        placeholder="Search movies..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-      <p className="num-results">
-        Found <strong>{movies.length}</strong> results
-      </p>
-    </nav>
+    <div className="logo">
+      <span role="img">🍿</span>
+      <h1>usePopcorn</h1>
+    </div>
+  );
+}
+
+function Nav({ children }) {
+  return <nav className="nav-bar">{children}</nav>;
+}
+
+function MovieLengthResult({ movies }) {
+  return (
+    <p className="num-results">
+      Found <strong>{movies.length}</strong> results
+    </p>
+  );
+}
+
+function Search({ query, setQuery }) {
+  return (
+    <input
+      className="search"
+      type="text"
+      placeholder="Search movies..."
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+    />
   );
 }

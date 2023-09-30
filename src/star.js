@@ -1,6 +1,5 @@
 import { useState } from "react";
 
-
 const containerStyle = {
   display: "flex",
   gap: "4px",
@@ -9,22 +8,23 @@ const containerStyle = {
 
 const starContainerStyle = {
   display: "flex",
-  alignItems: "center",               
+  alignItems: "center",
   lineHeight: "1",
   margin: "0",
 };
 
-export default function App({
+export default function StarRating({
   StarSize = 5,
   color = "#fcc419",
   size = 20,
   className = "",
-  defaultRate = 4,
+  defaultRate = 0,
   setRate,
 }) {
   const textStyle = {
-    fontSize: `${size}px`,
+    fontSize: `${(size / 1.5) * 1.1}px`,
     color,
+    marginLeft: "5px",
   };
   const [rating, setRating] = useState(defaultRate);
   const [tempRating, setTempRating] = useState(0);
