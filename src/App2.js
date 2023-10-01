@@ -1,52 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import StarRating from "./star";
-
-const tempMovieData = [
-  {
-    imdbID: "tt1375666",
-    Title: "Inception",
-    Year: "2010",
-    Poster:
-      "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg",
-  },
-  {
-    imdbID: "tt0133093",
-    Title: "The Matrix",
-    Year: "1999",
-    Poster:
-      "https://m.media-amazon.com/images/M/MV5BNzQzOTk3OTAtNDQ0Zi00ZTVkLWI0MTEtMDllZjNkYzNjNTc4L2ltYWdlXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_SX300.jpg",
-  },
-  {
-    imdbID: "tt6751668",
-    Title: "Parasite",
-    Year: "2019",
-    Poster:
-      "https://m.media-amazon.com/images/M/MV5BYWZjMjk3ZTItODQ2ZC00NTY5LWE0ZDYtZTI3MjcwN2Q5NTVkXkEyXkFqcGdeQXVyODk4OTc3MTY@._V1_SX300.jpg",
-  },
-];
-
-const tempWatchedData = [
-  {
-    imdbID: "tt1375666",
-    Title: "Inception",
-    Year: "2010",
-    Poster:
-      "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg",
-    runtime: 148,
-    imdbRating: 8.8,
-    userRating: 10,
-  },
-  {
-    imdbID: "tt0088763",
-    Title: "Back to the Future",
-    Year: "1985",
-    Poster:
-      "https://m.media-amazon.com/images/M/MV5BZmU0M2Y1OGUtZjIxNi00ZjBkLTg1MjgtOWIyNThiZWIwYjRiXkEyXkFqcGdeQXVyMTQxNzMzNDI@._V1_SX300.jpg",
-    runtime: 116,
-    imdbRating: 8.5,
-    userRating: 9,
-  },
-];
+import { useMovies } from "./useMovies";
+import { useLocalStorage } from "./useLocalStorage";
+import { useKey } from "./useKey";
 
 //creating a preloader
 
@@ -58,10 +14,8 @@ const KEY = "39fe5645";
 
 export default function App() {
   const [query, setQuery] = useState("");
-  const [movies, setMovies] = useState([]); //tempMovieData
-  const [watched, setWatched] = useState([]); //tempWatchedData
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [watched, setWatched] = useLocalStorage([], "watched");
+
   const [selectedId, setSelectedId] = useState(null);
 
   //const tempQuery = "interstellar";
@@ -80,48 +34,7 @@ export default function App() {
     console.log(watched);
   }
 
-  useEffect(
-    function () {
-      const controller = new AbortController();
-      async function fetchData() {
-        setIsLoading(true);
-        setError("");
-        try {
-          const res = await fetch(
-            `http://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
-            { signal: controller.signal }
-          );
-          if (!res.ok) throw new Error("Failed to Load movie");
-          const data = await res.json();
-          console.log(data);
-          if (data.Response === "False") throw new Error("Movie was not found");
-          setIsLoading(false);
-          setMovies(data.Search);
-          console.log(data.Search);
-        } catch (err) {
-          if (err.name !== "AbortError") {
-            console.error(err.message);
-            setError(err.message);
-          }
-        } finally {
-          setIsLoading(false);
-        }
-        setError("");
-      }
-
-      if (query.length < 3) {
-        setMovies([]);
-        setError("");
-        return;
-      }
-      fetchData();
-
-      return function () {
-        controller.abort();
-      };
-    },
-    [query]
-  );
+  const { error, isLoading, movies } = useMovies(query);
 
   return (
     <>
@@ -151,6 +64,7 @@ export default function App() {
               onLeaveDetails={handleBack}
               onMovieAddToList={handleAddToList}
               watched={watched}
+              onWatched={setWatched}
             />
           ) : (
             <>
@@ -241,16 +155,7 @@ function MovieDetails({
     (movie) => movie.imdbID === selectedId
   )?.userRating;
 
-  useEffect(
-    function () {
-      document.addEventListener("keydown", (e) => {
-        if (e.code === "Escape") {
-          onLeaveDetails();
-        }
-      });
-    },
-    [onLeaveDetails]
-  );
+  useKey("Escape", onLeaveDetails);
 
   function handleAddWatched() {
     const obj = {
@@ -416,6 +321,14 @@ function MovieLengthResult({ movies }) {
 }
 
 function Search({ query, setQuery }) {
+  const el = useRef(null);
+
+  useKey("Enter", function () {
+    if (document.activeElement === el.current) return;
+    el.current.focus();
+    setQuery("");
+  });
+
   return (
     <input
       className="search"
@@ -423,6 +336,7 @@ function Search({ query, setQuery }) {
       placeholder="Search movies..."
       value={query}
       onChange={(e) => setQuery(e.target.value)}
+      ref={el}
     />
   );
 }
